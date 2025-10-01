@@ -23,128 +23,96 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "UBPsiMulticomponentThermo.H"
 #include "ubPsiMulticomponentThermo.H"
-#include "surfaceFields.H"
+#include "zeroGradientFvPatchFields.H"
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    defineTypeNameAndDebug(ubPsiMulticomponentThermo, 0);
+    defineRunTimeSelectionTable(ubPsiMulticomponentThermo, fvMesh);
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-template<class BaseThermo>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::UBPsiMulticomponentThermo
+Foam::ubPsiMulticomponentThermo::implementation::implementation
 (
+    const dictionary& dict,
+    const wordList& specieNames,
     const fvMesh& mesh,
     const word& phaseName
 )
 :
-    PsiThermo<BaseThermo>(mesh, phaseName)
-{}
+    species_(specieNames),
+    Y_(species_.size())
+{
+    forAll(species_, i)
+    {
+        Y_.set
+        (
+            i,
+            new volScalarField
+            (
+                IOobject
+                (
+                    IOobject::groupName(species_[i], phaseName),
+                    mesh.time().name(),
+                    mesh,
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh
+            )
+        );
+    }
+}
+
+
+// * * * * * * * * * * * * * * * * Selectors * * * * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::ubPsiMulticomponentThermo>
+Foam::ubPsiMulticomponentThermo::New
+(
+    const fvMesh& mesh,
+    const word& phaseName
+)
+{
+    return basicThermo::New<ubPsiMulticomponentThermo>(mesh, phaseName);
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-template<class BaseThermo>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::~UBPsiMulticomponentThermo()
+Foam::ubPsiMulticomponentThermo::~ubPsiMulticomponentThermo()
+{}
+
+
+Foam::ubPsiMulticomponentThermo::implementation::~implementation()
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-template<class BaseThermo>
-Foam::tmp<Foam::volScalarField>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::Phi() const
+const Foam::speciesTable&
+Foam::ubPsiMulticomponentThermo::implementation::species() const
 {
-    return this->volScalarFieldMixtureProperty
-    (
-        "Phi",
-        dimless,
-        &BaseThermo::mixtureType::Phi
-    );
+    return species_;
 }
 
 
-template<class BaseThermo>
-Foam::tmp<Foam::volScalarField>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::ft() const
+Foam::PtrList<Foam::volScalarField>&
+Foam::ubPsiMulticomponentThermo::implementation::Y()
 {
-    return this->volScalarFieldMixtureProperty
-    (
-        "ft",
-        dimless,
-        &BaseThermo::mixtureType::ft
-    );
+    return Y_;
 }
 
 
-template<class BaseThermo>
-Foam::tmp<Foam::volScalarField>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::fu() const
+const Foam::PtrList<Foam::volScalarField>&
+Foam::ubPsiMulticomponentThermo::implementation::Y() const
 {
-    return this->volScalarFieldMixtureProperty
-    (
-        "fu",
-        dimless,
-        &BaseThermo::mixtureType::fu
-    );
-}
-
-
-template<class BaseThermo>
-Foam::tmp<Foam::volScalarField>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::egr() const
-{
-    return this->volScalarFieldMixtureProperty
-    (
-        "egr",
-        dimless,
-        &BaseThermo::mixtureType::egr
-    );
-}
-
-
-template<class BaseThermo>
-void Foam::UBPsiMulticomponentThermo<BaseThermo>::reset
-(
-    volScalarField& b,
-    volScalarField& c,
-    const PtrList<volScalarField>& Yb,
-    const volScalarField& heb
-)
-{
-    BaseThermo::mixtureType::reset(b, this->Y(), c, Yb);
-
-    volScalarField& heu = this->he();
-
-    for (label i=0; i<=heu.nOldTimes(); i++)
-    {
-        heu.oldTimeRef(i) =
-            b.oldTime(i)*heu.oldTime(i) + c.oldTime(i)*heb.oldTime(i);
-    }
-
-    this->correct();
-
-    for (label i=0; i<=b.nOldTimes(); i++)
-    {
-        b.oldTimeRef(i) = 1.0;
-    }
-
-    for (label i=0; i<=c.nOldTimes(); i++)
-    {
-        c.oldTimeRef(i) = 1.0 - b.oldTime(i);
-    }
-}
-
-
-template<class BaseThermo>
-Foam::tmp<Foam::volScalarField>
-Foam::UBPsiMulticomponentThermo<BaseThermo>::hf() const
-{
-    return this->volScalarFieldProperty
-    (
-        "hf",
-        dimEnergy/dimMass,
-        &BaseThermo::mixtureType::thermoMixture,
-        &BaseThermo::mixtureType::thermoMixtureType::hf
-    );
+    return Y_;
 }
 
 
